@@ -38,7 +38,17 @@ def mes_atual():
     return date.today().strftime("%Y-%m")
 
 
-@cached()
+def _resumo_para(meses):
+    """Resumo em memória (lib/resumo.py) se ele cobrir os meses pedidos;
+    senão None, e quem chamou consulta o BigQuery direto."""
+    from lib import resumo as resumo_memoria
+
+    resumo = resumo_memoria.obter()
+    if resumo is not None and resumo.cobre(meses):
+        return resumo
+    return None
+
+
 def projecao_mes_atual(banco):
     """Projeção simples de fim de mês (run-rate): pega a produção líquida
     acumulada no mês corrente e extrapola pela proporção de dias já
@@ -48,6 +58,22 @@ def projecao_mes_atual(banco):
     dias_no_mes = calendar.monthrange(hoje.year, hoje.month)[1]
     dias_passados = hoje.day
 
+    producao_mtd = _total_mes(banco, mes_atual())
+
+    if dias_passados == 0:
+        return producao_mtd
+    return producao_mtd / dias_passados * dias_no_mes
+
+
+def _total_mes(banco, mes):
+    resumo = _resumo_para([mes])
+    if resumo is not None:
+        return resumo.total(banco, [mes])
+    return _total_mes_bigquery(banco, mes)
+
+
+@cached()
+def _total_mes_bigquery(banco, mes):
     client = get_bigquery_client()
     tabela = f"`{PROJECT}.{DATASET}.{TABELA_PRINCIPAL}`"
 
@@ -59,23 +85,36 @@ def projecao_mes_atual(banco):
     """
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("mes", "STRING", mes_atual()),
+            bigquery.ScalarQueryParameter("mes", "STRING", mes),
             bigquery.ScalarQueryParameter("banco", "STRING", banco.upper() if banco else None),
         ]
     )
     rows = list(client.query(query, job_config=job_config).result())
-    producao_mtd = float(rows[0]["total"] or 0) if rows else 0.0
-
-    if dias_passados == 0:
-        return producao_mtd
-    return producao_mtd / dias_passados * dias_no_mes
+    return float(rows[0]["total"] or 0) if rows else 0.0
 
 
-@cached()
 def listar_meses_disponiveis(limite=24):
     """Meses com dados na tabela (para popular o seletor), mais recentes
     primeiro. Garante que o mês atual sempre apareça na lista, mesmo que
     ainda não tenha dados."""
+    resumo = _resumo_para([])
+    # o resumo só cobre os últimos RESUMO_MESES meses: se ali já há
+    # `limite` meses com dado, são exatamente os mais recentes da base
+    if resumo is not None:
+        meses = resumo.meses()
+        if len(meses) >= limite:
+            return _com_mes_atual(meses[:limite])
+    return _listar_meses_bigquery(limite)
+
+
+def _com_mes_atual(meses):
+    meses = set(meses)
+    meses.add(mes_atual())
+    return sorted(meses, reverse=True)
+
+
+@cached()
+def _listar_meses_bigquery(limite):
     client = get_bigquery_client()
     tabela = f"`{PROJECT}.{DATASET}.{TABELA_PRINCIPAL}`"
 
@@ -90,18 +129,23 @@ def listar_meses_disponiveis(limite=24):
         query_parameters=[bigquery.ScalarQueryParameter("limite", "INT64", limite)]
     )
     rows = client.query(query, job_config=job_config).result()
-    meses = {row["mes"] for row in rows if row["mes"]}
-    meses.add(mes_atual())
-    return sorted(meses, reverse=True)
+    return _com_mes_atual(row["mes"] for row in rows if row["mes"])
 
 
-@cached()
 def resumo_por_dia(banco, meses):
     """Soma de vlr_liquido por dia, dentro dos meses selecionados — para o
     gráfico (granularidade diária)."""
     if not meses:
         return []
 
+    resumo = _resumo_para(meses)
+    if resumo is not None:
+        return resumo.por_dia(banco, meses)
+    return _resumo_por_dia_bigquery(banco, meses)
+
+
+@cached()
+def _resumo_por_dia_bigquery(banco, meses):
     client = get_bigquery_client()
     tabela = f"`{PROJECT}.{DATASET}.{TABELA_PRINCIPAL}`"
 
@@ -149,7 +193,6 @@ def resumo_por_mes(banco, meses):
     return [{"mes": row["mes"], "total": float(row["total"] or 0)} for row in rows]
 
 
-@cached()
 def resumo_hierarquico(banco, meses, produto=None, nome_convenio=None):
     """Soma de vlr_liquido agrupada em banco -> convênio -> produto, para a
     tabela abaixo do gráfico.
@@ -166,6 +209,18 @@ def resumo_hierarquico(banco, meses, produto=None, nome_convenio=None):
     if not meses:
         return []
 
+    resumo = _resumo_para(meses)
+    if resumo is not None:
+        linhas = resumo.hierarquico(banco, meses, produto=produto, nome_convenio=nome_convenio)
+    else:
+        linhas = _resumo_hierarquico_bigquery(banco, meses, produto, nome_convenio)
+    return _montar_arvore(linhas)
+
+
+@cached()
+def _resumo_hierarquico_bigquery(banco, meses, produto, nome_convenio):
+    """Linhas (banco, convênio, produto, produção) direto do BigQuery —
+    usado quando o resumo em memória não cobre o período."""
     from lib.manutencao import garantir_colunas_map
 
     garantir_colunas_map()
@@ -194,15 +249,18 @@ def resumo_hierarquico(banco, meses, produto=None, nome_convenio=None):
             bigquery.ScalarQueryParameter("nome_convenio", "STRING", nome_convenio or None),
         ]
     )
-    rows = list(client.query(query, job_config=job_config).result())
+    rows = client.query(query, job_config=job_config).result()
+    return [
+        (row["banco"] or "(sem banco)", row["convenio"], row["produto"], float(row["producao"] or 0))
+        for row in rows
+    ]
 
+
+def _montar_arvore(linhas):
+    """(banco, convênio, produto, produção) → árvore banco > convênio >
+    produto, com subtotais e ordenada da maior para a menor produção."""
     arvore = {}
-    for row in rows:
-        b = row["banco"] or "(sem banco)"
-        c = row["convenio"]
-        p = row["produto"]
-        v = float(row["producao"] or 0)
-
+    for b, c, p, v in linhas:
         banco_node = arvore.setdefault(b, {"total": 0.0, "convenios": {}})
         banco_node["total"] += v
 

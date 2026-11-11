@@ -119,6 +119,15 @@ def ler_arquivo(file_storage):
             buffer.seek(0)
             return pd.read_csv(buffer, sep=";", encoding="latin1", engine="python", on_bad_lines="skip")
 
+    # calamine (Rust) lê .xlsx muitas vezes mais rápido e com menos memória
+    # que o openpyxl — com openpyxl, relatórios grandes passavam dos 30 s do
+    # gunicorn e o worker era morto (erro 500 na importação). openpyxl fica
+    # só como reserva caso o calamine não esteja instalado ou recuse o arquivo.
+    try:
+        return pd.read_excel(buffer, engine="calamine")
+    except Exception:  # noqa: BLE001
+        pass
+    buffer.seek(0)
     return pd.read_excel(buffer, engine="openpyxl")
 
 

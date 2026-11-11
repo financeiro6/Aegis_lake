@@ -64,3 +64,20 @@ def invalidar_tudo():
         qtd = len(_store)
         _store.clear()
     log.info("CACHE INVALIDADO — %s entradas removidas", qtd)
+
+    for callback in list(_ao_invalidar):
+        try:
+            callback()
+        except Exception:  # noqa: BLE001
+            log.exception("Falha ao avisar %s sobre a invalidação do cache", callback)
+
+
+_ao_invalidar = []
+
+
+def registrar_ao_invalidar(callback):
+    """Registra uma função chamada logo depois de invalidar_tudo() — usada
+    pelo resumo em memória (lib/resumo.py) para se recarregar quando algo
+    escreve na base."""
+    if callback not in _ao_invalidar:
+        _ao_invalidar.append(callback)

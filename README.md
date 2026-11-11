@@ -27,6 +27,15 @@ taurus/
 - Os dois se falam via **proxy do Vite** (`/api/*` → `localhost:8000`) —
   isso faz o navegador achar que é tudo a mesma origem, então cookies de
   sessão funcionam normalmente e não tem CORS pra configurar.
+- **Resumo em memória do Dashboard** (`backend/lib/resumo.py`): uma
+  consulta só agrupa a base por dia × banco × convênio × produto (últimos
+  `RESUMO_MESES` meses, padrão 36) e guarda o resultado na memória do
+  servidor. Gráfico, árvore, projeção e lista de meses saem daí, sem ir ao
+  BigQuery a cada filtro. É recarregado na subida, depois de qualquer
+  gravação (`invalidar_tudo()`, em segundo plano) e a cada
+  `RESUMO_TTL_MIN` minutos (padrão 30). Período anterior à janela, falha
+  na carga ou resumo acima de `RESUMO_MAX_LINHAS` linhas (padrão 1,5
+  milhão) → as telas voltam a consultar o BigQuery direto.
 
 ## Como rodar (dois terminais)
 
