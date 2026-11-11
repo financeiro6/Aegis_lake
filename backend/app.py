@@ -10,6 +10,27 @@ from dotenv import load_dotenv
 
 load_dotenv(BASE_DIR / ".env.local")
 
+# Diagnóstico de deploy: lista no log quais variáveis esperadas chegaram
+# (só os NOMES, nunca os valores). Nomes parecidos (espaço sobrando,
+# minúsculas) aparecem como "parecidas" para achar erro de digitação.
+_VARIAVEIS_ESPERADAS = [
+    "BIGQUERY_PROJECT_ID", "GOOGLE_CREDENTIALS_JSON", "FLASK_SECRET_KEY",
+    "ADMIN_BOOTSTRAP_EMAIL", "ADMIN_BOOTSTRAP_PASSWORD",
+]
+_presentes = [n for n in _VARIAVEIS_ESPERADAS if (os.environ.get(n) or "").strip()]
+_faltando = [n for n in _VARIAVEIS_ESPERADAS if n not in _presentes]
+_parecidas = sorted(
+    repr(n) for n in os.environ
+    if n not in _VARIAVEIS_ESPERADAS
+    and n.strip().upper() in _VARIAVEIS_ESPERADAS
+)
+print(
+    f"[config] variáveis presentes: {', '.join(_presentes) or 'nenhuma'} | "
+    f"faltando ou vazias: {', '.join(_faltando) or 'nenhuma'}"
+    + (f" | nomes parecidos (corrigir): {', '.join(_parecidas)}" if _parecidas else ""),
+    flush=True,
+)
+
 from flask import Flask, jsonify, send_from_directory
 from flask.json.provider import DefaultJSONProvider
 
