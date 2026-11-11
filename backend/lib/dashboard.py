@@ -2,6 +2,7 @@ import calendar
 import os
 from datetime import date
 
+import pandas as pd
 from google.cloud import bigquery
 
 from lib.bigquery_client import get_bigquery_client
@@ -405,15 +406,31 @@ def _consultar_producao_por_indicado(banco, meses):
     ]
 
 
+@cached()
 def _nomes_indicados_por_codigo():
     """Código (cod_loja) → nome cadastrado, pra não mostrar só o código
-    cru na planilha de detalhamento."""
-    from lib.indicados import listar_indicados
-    try:
-        indicados_cadastrados = listar_indicados()
-    except Exception:  # noqa: BLE001
+    cru na planilha de detalhamento.
+
+    Usa TODOS os indicados (carregar_todos_indicados), não listar_indicados:
+    essa é a listagem da tela, limitada aos 200 mais recentes — quem
+    ficasse fora desse corte sumia do detalhamento sem aviso."""
+    from lib.indicados import carregar_todos_indicados
+
+    df = carregar_todos_indicados()
+    if df.empty or "cod_loja" not in df.columns:
         return {}
-    return {
-        str(i.get("cod_loja")): (i.get("nome") or i.get("usuario") or str(i.get("cod_loja")))
-        for i in indicados_cadastrados if i.get("cod_loja")
-    }
+
+    nomes = {}
+    for linha in df.to_dict("records"):
+        codigo = linha.get("cod_loja")
+        if codigo is None or (isinstance(codigo, float) and pd.isna(codigo)):
+            continue
+        codigo = str(codigo).strip()
+        if not codigo:
+            continue
+        nome = next(
+            (v for v in (linha.get("nome"), linha.get("usuario")) if isinstance(v, str) and v.strip()),
+            codigo,
+        )
+        nomes.setdefault(codigo, nome)
+    return nomes
