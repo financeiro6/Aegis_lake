@@ -93,4 +93,4 @@ def gerar_relatorio_df(banco, data_inicio, data_fim, cod_master, cod_indicado):
     job_config = bigquery.QueryJobConfig(
         query_parameters=_query_params(banco, data_inicio, data_fim, cod_master, cod_indicado)
     )
-    return client.query(query, job_config=job_config).result().to_dataframe()
+    return client.query(query, job_config=job_config).result().to_dataframe(create_bqstorage_client=False)

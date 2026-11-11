@@ -173,6 +173,6 @@ def carregar_todos_indicados():
     client = get_bigquery_client()
     tabela = f"`{PROJECT}.{DATASET}.{TABELA_INDICADOS}`"
     try:
-        return client.query(f"SELECT * FROM {tabela}").to_dataframe()
+        return client.query(f"SELECT * FROM {tabela}").to_dataframe(create_bqstorage_client=False)
     except NotFound:
         return pd.DataFrame()
