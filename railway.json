@@ -5,6 +5,7 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
+    "startCommand": "sh -c 'cd /app/backend && exec gunicorn -b 0.0.0.0:${PORT:-8000} --timeout 300 --workers 1 --worker-class gthread --threads 4 app:app'",
     "numReplicas": 1,
     "healthcheckPath": "/",
     "healthcheckTimeout": 120,
