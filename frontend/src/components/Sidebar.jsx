@@ -15,6 +15,7 @@ import {
   Plus,
   Table,
 } from "./icons";
+import { VALORES_ABERTOS_ATIVO } from "../config/funcionalidades";
 
 const PRODUCAO_PATHS = ["/", "/importar", "/logs", "/relatorio", "/parametros"];
 const CAMPANHAS_PATHS = ["/campanhas", "/campanhas/cadastro", "/campanhas/criterios"];
@@ -104,6 +105,7 @@ export default function Sidebar() {
 
         <Item to="/indicados" icon={<Users />} papel={papel}>Indicados</Item>
 
+        {VALORES_ABERTOS_ATIVO && (
         <details className="nav-group" open={valoresAbertosAberto || valoresAbertosAtivo} onToggle={(e) => setValoresAbertosAberto(e.target.open)}>
           <summary className={valoresAbertosAtivo ? "has-active" : ""}>
             <DollarSign /> Valores em aberto
@@ -114,6 +116,7 @@ export default function Sidebar() {
             <Item to="/valores-abertos/acompanhamento" icon={<ListIcon />} papel={papel}>Acompanhamento</Item>
           </div>
         </details>
+        )}
 
         {(papel === "admin") && (
           <>

@@ -7,6 +7,7 @@ import MultiSelectDropdown from "../components/MultiSelectDropdown";
 import Modal from "../components/Modal";
 import { Plus, Trash, Settings, DollarSign, Download, Refresh } from "../components/icons";
 import { brl, percentual } from "../utils/format";
+import { VALORES_ABERTOS_ATIVO } from "../config/funcionalidades";
 
 const STATUS_OPCOES = ["Vigente", "Finalizada", "Em Apuração"];
 
@@ -67,6 +68,7 @@ export default function CampanhasCadastro() {
   const { data: categoriasValoresAbertos = [] } = useQuery({
     queryKey: ["valores-abertos-categorias"],
     queryFn: buscarCategoriasValoresAbertos,
+    enabled: VALORES_ABERTOS_ATIVO,
   });
   const { data: valoresMapeados = { map_indicado: [], map_convenio: [], map_produto: [] } } = useQuery({
     queryKey: ["valores-mapeados"],
@@ -434,9 +436,11 @@ export default function CampanhasCadastro() {
                     <button className="btn-link" onClick={() => handleEditar(c)} title="Editar" style={{ marginRight: "0.4rem" }}>
                       <Settings />
                     </button>
-                    <button className="btn-link" onClick={() => abrirModalValoresAbertos(c)} title="Adicionar aos valores em aberto" style={{ marginRight: "0.4rem" }}>
-                      <DollarSign />
-                    </button>
+                    {VALORES_ABERTOS_ATIVO && (
+                      <button className="btn-link" onClick={() => abrirModalValoresAbertos(c)} title="Adicionar aos valores em aberto" style={{ marginRight: "0.4rem" }}>
+                        <DollarSign />
+                      </button>
+                    )}
                     <button
                       className="btn-link"
                       onClick={() => handleBaixarApuracao(c)}

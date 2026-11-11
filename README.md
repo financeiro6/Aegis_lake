@@ -197,8 +197,13 @@ acessa no navegador**, não o :8000.
   (`vlr_liquido`) e Bruto (`vlr_bruto`) em vez de número digitado — cada
   critério escolhe o seu; se não escolher, herda o padrão da campanha
   (`base_producao`, também configurável no Cadastro de Campanha)
-- **Módulo Valores em Aberto** (Editor/Admin) — grupo novo na sidebar com
-  3 telas:
+- **Módulo Valores em Aberto** — **DESATIVADO** (some do menu, das rotas,
+  do botão em Campanhas → Cadastro, da Manutenção e do papel em Usuários;
+  a API responde 404). Código e tabela `valores_abertos` no BigQuery
+  continuam intactos. Para reativar: `VALORES_ABERTOS_ATIVO = true` em
+  `frontend/src/config/funcionalidades.js` **e** variável de ambiente
+  `VALORES_ABERTOS_ATIVO=true` no Railway. Como era (Editor/Admin) — grupo
+  na sidebar com 3 telas:
   - *Visão geral*: KPIs (pendente total, previsto hoje, em atraso) +
     listas detalhadas, como um fluxo de caixa
   - *Cadastro*: lançamentos manuais (Banco, Categoria, Período de Ref,

@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import api from "../api/client";
 import PageHeader from "../components/PageHeader";
 import { Settings } from "../components/icons";
+import { VALORES_ABERTOS_ATIVO } from "../config/funcionalidades";
 
 export default function Manutencao() {
   const [resultado, setResultado] = useState(null);
@@ -61,6 +62,7 @@ export default function Manutencao() {
         </Link>
       </div>
 
+      {VALORES_ABERTOS_ATIVO && (
       <div className="card">
         <p className="section-title" style={{ marginTop: 0 }}>Sincronizar valores de campanhas</p>
         <button
@@ -92,6 +94,7 @@ export default function Manutencao() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

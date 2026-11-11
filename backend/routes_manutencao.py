@@ -23,6 +23,10 @@ def manutencao_sincronizar_valores_campanhas():
     """ETL: atualiza os lançamentos de Valores em Aberto vinculados a
     campanhas com a projeção mais recente de cada campanha (ver
     lib.valores_abertos.sincronizar_valores_abertos_de_campanhas)."""
+    from lib.funcionalidades import VALORES_ABERTOS_ATIVO
+
+    if not VALORES_ABERTOS_ATIVO:
+        return jsonify({"ok": False, "erro": "O módulo Valores em aberto está desativado."}), 404
     try:
         resultado = sincronizar_valores_abertos_de_campanhas()
     except Exception as exc:  # noqa: BLE001

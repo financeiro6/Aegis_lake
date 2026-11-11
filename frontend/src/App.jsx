@@ -19,6 +19,7 @@ import Mapeamento from "./pages/Mapeamento";
 import ValoresAbertosVisaoGeral from "./pages/ValoresAbertosVisaoGeral";
 import ValoresAbertosCadastro from "./pages/ValoresAbertosCadastro";
 import ValoresAbertosAcompanhamento from "./pages/ValoresAbertosAcompanhamento";
+import { VALORES_ABERTOS_ATIVO } from "./config/funcionalidades";
 
 const SOMENTE_EDITOR_ADMIN = ["admin", "editor"];
 const VISAO_GERAL = ["admin", "editor", "visualizador"];
@@ -81,18 +82,22 @@ export default function App() {
           element={<ProtectedRoute papeis={["admin"]}><Mapeamento /></ProtectedRoute>}
         />
 
-        <Route
-          path="/valores-abertos"
-          element={<ProtectedRoute papeis={VALORES_ABERTOS_LEITURA}><ValoresAbertosVisaoGeral /></ProtectedRoute>}
-        />
-        <Route
-          path="/valores-abertos/cadastro"
-          element={<ProtectedRoute papeis={VALORES_ABERTOS_ESCRITA}><ValoresAbertosCadastro /></ProtectedRoute>}
-        />
-        <Route
-          path="/valores-abertos/acompanhamento"
-          element={<ProtectedRoute papeis={VALORES_ABERTOS_ESCRITA}><ValoresAbertosAcompanhamento /></ProtectedRoute>}
-        />
+        {VALORES_ABERTOS_ATIVO && (
+          <>
+            <Route
+              path="/valores-abertos"
+              element={<ProtectedRoute papeis={VALORES_ABERTOS_LEITURA}><ValoresAbertosVisaoGeral /></ProtectedRoute>}
+            />
+            <Route
+              path="/valores-abertos/cadastro"
+              element={<ProtectedRoute papeis={VALORES_ABERTOS_ESCRITA}><ValoresAbertosCadastro /></ProtectedRoute>}
+            />
+            <Route
+              path="/valores-abertos/acompanhamento"
+              element={<ProtectedRoute papeis={VALORES_ABERTOS_ESCRITA}><ValoresAbertosAcompanhamento /></ProtectedRoute>}
+            />
+          </>
+        )}
       </Route>
     </Routes>
   );

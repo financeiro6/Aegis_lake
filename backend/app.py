@@ -88,7 +88,12 @@ app.register_blueprint(bp_relatorio)
 app.register_blueprint(bp_parametros)
 app.register_blueprint(bp_indicados)
 app.register_blueprint(bp_manutencao)
-app.register_blueprint(bp_valores_abertos)
+# Valores em aberto está desativado (lib/funcionalidades.py): sem o
+# blueprint, a API do módulo responde 404.
+from lib.funcionalidades import VALORES_ABERTOS_ATIVO
+
+if VALORES_ABERTOS_ATIVO:
+    app.register_blueprint(bp_valores_abertos)
 app.register_blueprint(bp_mapeamento_categorias)
 
 # Aquecimento em background (mesmo mecanismo do projeto anterior) — deixa o

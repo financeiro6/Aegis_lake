@@ -5,6 +5,7 @@ import api from "../api/client";
 import PageHeader from "../components/PageHeader";
 import { Users, Plus, Trash, Settings } from "../components/icons";
 import { useAuth } from "../context/AuthContext";
+import { VALORES_ABERTOS_ATIVO } from "../config/funcionalidades";
 
 const PAPEL_LABEL = {
   admin: "Admin",
@@ -144,7 +145,7 @@ export default function AdminUsuarios() {
               <option value="admin">Admin</option>
               <option value="editor">Editor</option>
               <option value="visualizador">Visualizador</option>
-              <option value="valores_abertos">Visualizador de Valores em Aberto</option>
+              {VALORES_ABERTOS_ATIVO && <option value="valores_abertos">Visualizador de Valores em Aberto</option>}
             </select>
           </div>
           <div className="form-row form-row-action">
