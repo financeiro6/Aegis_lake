@@ -17,6 +17,10 @@ TABELA_MAPEAMENTO = os.environ.get("BIGQUERY_MAPEAMENTO_TABLE", "config_mapeamen
 
 _tabela_garantida = False
 _tabela_lock = threading.Lock()
+# Gravações na tabela de mapeamento em fila: com o gunicorn em threads,
+# dois salvamentos ao mesmo tempo poderiam se atropelar no
+# CREATE OR REPLACE TABLE (sem billing) e um apagar o que o outro gravou.
+_escrita_lock = threading.Lock()
 
 SCHEMA_MAPEAMENTO = [
     bigquery.SchemaField("banco_tipo", "STRING"),
@@ -226,27 +230,24 @@ def definir_mapeamento(banco_tipo, campo_destino, campo_origem, banco_nome=None,
     if config_nome is None:
         config_nome = obter_config_nome(banco_tipo) or banco_nome
 
-    _remover_linha(client, banco_tipo, campo_destino)
-
-    linha = pd.DataFrame([{
-        "banco_tipo": banco_tipo,
-        "banco_nome": banco_nome,
-        "config_nome": config_nome,
-        "campo_destino": campo_destino,
-        "campo_origem": campo_origem,
-        "atualizado_em": datetime.utcnow(),
-    }])
-    table_id = f"{PROJECT}.{DATASET}.{TABELA_MAPEAMENTO}"
-    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
-    job = client.load_table_from_dataframe(linha, table_id, job_config=job_config)
-    job.result()
+    with _escrita_lock:
+        _remover_linha(client, banco_tipo, campo_destino)
+        _inserir_linhas(client, [{
+            "banco_tipo": banco_tipo,
+            "banco_nome": banco_nome,
+            "config_nome": config_nome,
+            "campo_destino": campo_destino,
+            "campo_origem": campo_origem,
+            "atualizado_em": datetime.utcnow(),
+        }])
 
     invalidar_tudo()
 
 
 def excluir_mapeamento(banco_tipo, campo_destino):
     client = _client_com_seed()
-    _remover_linha(client, banco_tipo, campo_destino)
+    with _escrita_lock:
+        _remover_linha(client, banco_tipo, campo_destino)
     invalidar_tudo()
 
 
@@ -314,25 +315,75 @@ def definir_linha_completa(banco_tipo, banco_nome, config_nome, campos):
     """Salva (adiciona ou edita) todos os campos de uma configuração de uma
     vez só — usado pelo formulário horizontal da tela de Parâmetros. Valida
     as regras de negócio antes de gravar qualquer coisa. Campo deixado
-    vazio remove o mapeamento (se existir); campo preenchido grava/atualiza."""
+    vazio remove o mapeamento (se existir); campo preenchido grava/atualiza.
+
+    São só DUAS operações na tabela (remove a configuração inteira e insere
+    as linhas preenchidas), e não duas por campo: o BigQuery limita as
+    alterações por tabela (~5 a cada 10 s) e gravar campo a campo estourava
+    esse limite e deixava o salvamento lento."""
     erros = validar_linha_completa(campos)
     if erros:
         return erros
 
-    for campo_destino in CAMPOS_MAPEAVEIS:
-        valor = (campos.get(campo_destino) or "").strip()
-        if valor:
-            definir_mapeamento(banco_tipo, campo_destino, valor, banco_nome=banco_nome, config_nome=config_nome)
-        else:
-            excluir_mapeamento(banco_tipo, campo_destino)
+    agora = datetime.utcnow()
+    linhas = [
+        {
+            "banco_tipo": banco_tipo,
+            "banco_nome": banco_nome,
+            "config_nome": config_nome,
+            "campo_destino": campo_destino,
+            "campo_origem": (campos.get(campo_destino) or "").strip(),
+            "atualizado_em": agora,
+        }
+        for campo_destino in CAMPOS_MAPEAVEIS
+        if (campos.get(campo_destino) or "").strip()
+    ]
 
+    client = _client_com_seed()
+    with _escrita_lock:
+        _remover_configuracao(client, banco_tipo)
+        _inserir_linhas(client, linhas)
+
+    invalidar_tudo()
     return []
 
 
 def excluir_todos_mapeamentos_do_banco(banco_tipo):
-    """Remove a configuração inteira (todos os campos)."""
-    for campo in CAMPOS_MAPEAVEIS:
-        excluir_mapeamento(banco_tipo, campo)
+    """Remove a configuração inteira (todos os campos) numa operação só."""
+    client = _client_com_seed()
+    with _escrita_lock:
+        _remover_configuracao(client, banco_tipo)
+    invalidar_tudo()
+
+
+def _remover_configuracao(client, banco_tipo):
+    """Apaga todas as linhas de um banco_tipo — DELETE, ou CREATE OR
+    REPLACE TABLE quando o projeto não tem billing (mesmo padrão de
+    _remover_linha)."""
+    tabela_id = f"{PROJECT}.{DATASET}.{TABELA_MAPEAMENTO}"
+    tabela = f"`{tabela_id}`"
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[bigquery.ScalarQueryParameter("bt", "STRING", banco_tipo)]
+    )
+    try:
+        client.query(f"DELETE FROM {tabela} WHERE banco_tipo = @bt", job_config=job_config).result()
+    except Exception as exc:  # noqa: BLE001
+        if not erro_e_de_billing(exc):
+            raise
+        rebuild_query = f"""
+            CREATE OR REPLACE TABLE {tabela} AS
+            SELECT * FROM {tabela}
+            WHERE banco_tipo != @bt
+        """
+        client.query(rebuild_query, job_config=job_config).result()
+
+
+def _inserir_linhas(client, linhas):
+    if not linhas:
+        return
+    table_id = f"{PROJECT}.{DATASET}.{TABELA_MAPEAMENTO}"
+    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    client.load_table_from_dataframe(pd.DataFrame(linhas), table_id, job_config=job_config).result()
 
 
 def obter_banco_nome(banco_tipo):
