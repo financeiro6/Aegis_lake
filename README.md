@@ -261,7 +261,38 @@ re-render). Recomendo que, ao testar, você abra o DevTools do navegador
 uma nova chamada de API pra dados já carregados — é o comportamento que
 essa arquitetura deveria garantir.
 
-## Deploy no Render
+## Deploy no Railway (produção)
+
+O Railway constrói a imagem pelo `Dockerfile` da raiz (build do React +
+Flask/gunicorn servindo o build), com as opções de `railway.json`
+(1 réplica, health check em `/`, reinício automático em falha). A porta
+vem do Railway em `$PORT`; o `gunicorn` sobe com 1 processo, 4 threads e
+timeout de 300 s (importação de arquivo grande).
+
+### Passo a passo
+
+1. No Railway: **New Project → Deploy from GitHub repo** →
+   `Aegis_lake`, branch `main`. Ele detecta o `Dockerfile` sozinho.
+2. Em **Variables** do serviço, cadastrar:
+   - `BIGQUERY_PROJECT_ID`
+   - `GOOGLE_CREDENTIALS_JSON` — o **conteúdo inteiro** do JSON da
+     credencial de serviço do Google Cloud (o mesmo valor usado na Render)
+   - `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD`
+   - `FLASK_SECRET_KEY` — um texto aleatório longo e fixo. Sem ela, cada
+     deploy gera uma chave nova e todo mundo é deslogado.
+   - opcionais: `BIGQUERY_DATASET`, `BIGQUERY_TABLE`, `RESUMO_MESES`,
+     `RESUMO_TTL_MIN`, `RESUMO_MAX_LINHAS`
+3. Em **Settings → Networking → Generate Domain** para ter a URL pública
+   (ou apontar um domínio próprio).
+4. Todo push no `main` faz deploy automático.
+
+O serviço não "dorme" como no plano free da Render, então o cache e o
+resumo em memória ficam quentes entre um acesso e outro.
+
+## Deploy no Render (antigo)
+
+Mantido só durante a transição para o Railway — depois de desligar o
+serviço na Render, este `render.yaml` pode ser removido.
 
 O projeto roda como **um único serviço**: o Flask serve tanto a API
 (`/api/*`) quanto os arquivos do React já compilados (todo o resto) — não
