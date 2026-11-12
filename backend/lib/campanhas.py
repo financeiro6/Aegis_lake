@@ -461,20 +461,13 @@ def excluir_criterio(id_, excluido_por=None):
 # ─────────────────────────────────────────────────────────────────────────
 # Atingimento de meta (liga a campanha à produção real da base consolidada)
 # ─────────────────────────────────────────────────────────────────────────
-@cached()
-def _detalhes_producao_campanha(campanha, data_inicio, data_fim):
-    """Busca as linhas de produção da campanha (banco + período + filtros
-    opcionais de map_indicado/map_convenio/map_produto), já com os campos
-    necessários pra casar cada linha com um critério (mesma lógica do
-    relatório de apuração) e pra calcular a projeção (data de cada
-    linha)."""
-    from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
-    from lib.manutencao import garantir_colunas_map
-
-    garantir_colunas_map()
-
-    client = get_bigquery_client()
-    tabela = f"`{P_DASH}.{D_DASH}.{TABELA_PRINCIPAL}`"
+def _filtros_producao_campanha(campanha, data_inicio, data_fim):
+    """Condições SQL + parâmetros que definem QUAL produção conta para a
+    campanha: banco + período + filtros opcionais de map_indicado/
+    map_convenio/map_produto. Usado pela Visão geral e pelo relatório de
+    apuração — os dois precisam olhar exatamente a mesma produção, senão
+    a faixa atingida sai diferente em cada um."""
+    from lib.dashboard import DATE_COLUMN
 
     condicoes = [f"UPPER(banco) = @banco", f"{DATE_COLUMN} BETWEEN @data_inicio AND @data_fim"]
     params = [
@@ -495,7 +488,25 @@ def _detalhes_producao_campanha(campanha, data_inicio, data_fim):
             condicoes.append(f"{coluna} IN UNNEST(@{nome_param})")
             params.append(bigquery.ArrayQueryParameter(nome_param, "STRING", valores))
 
-    where_sql = " AND ".join(condicoes)
+    return " AND ".join(condicoes), params
+
+
+@cached()
+def _detalhes_producao_campanha(campanha, data_inicio, data_fim):
+    """Busca as linhas de produção da campanha (banco + período + filtros
+    opcionais de map_indicado/map_convenio/map_produto), já com os campos
+    necessários pra casar cada linha com um critério (mesma lógica do
+    relatório de apuração) e pra calcular a projeção (data de cada
+    linha)."""
+    from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
+    from lib.manutencao import garantir_colunas_map
+
+    garantir_colunas_map()
+
+    client = get_bigquery_client()
+    tabela = f"`{P_DASH}.{D_DASH}.{TABELA_PRINCIPAL}`"
+
+    where_sql, params = _filtros_producao_campanha(campanha, data_inicio, data_fim)
     query = f"""
         SELECT
             {DATE_COLUMN} AS data_pagamento,
@@ -963,7 +974,9 @@ def gerar_relatorio_apuracao(campanha_id):
         campanha) * (perc_especial / 100)
       - se algum critério bater sem % especial ("inclusivo") →
         valor_apuracao = valor da linha * (percentual da faixa que a
-        campanha atingiu no período, com base na produção total)."""
+        campanha atingiu no período, com base na produção total);
+      - se a campanha não alcançou nenhuma faixa → valor_apuracao = 0 em
+        todas as linhas, inclusive as de % especial."""
     from lib.dashboard import PROJECT as P_DASH, DATASET as D_DASH, TABELA_PRINCIPAL, DATE_COLUMN
     from lib.manutencao import garantir_colunas_map
 
@@ -987,19 +1000,20 @@ def gerar_relatorio_apuracao(campanha_id):
         "data_pagamento", "ade", "banco", "convenio", "produto", "map_convenio", "map_produto",
         "cod_tabela", "tabela", "vlr_liquido", "vlr_bruto", "prazo", "usuario", "cod_corretor", "cod_master", "cod_indicado",
     ]
+    # Mesma produção da Visão geral: banco + período + filtros de
+    # indicado/convênio/produto da campanha. Antes o relatório ignorava
+    # esses filtros e somava a produção inteira do banco — a faixa saía
+    # mais alta que a da tela e campanha que não bateu a meta mínima
+    # aparecia com valor no relatório.
+    where_sql, params = _filtros_producao_campanha(
+        campanha, _para_date(campanha.get("data_inicio")), _para_date(campanha.get("data_fim"))
+    )
     query = f"""
         SELECT {", ".join(colunas)}
         FROM {tabela}
-        WHERE UPPER(banco) = @banco
-          AND {DATE_COLUMN} BETWEEN @data_inicio AND @data_fim
+        WHERE {where_sql}
     """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("banco", "STRING", (campanha.get("banco") or "").upper()),
-            bigquery.ScalarQueryParameter("data_inicio", "DATE", campanha.get("data_inicio")),
-            bigquery.ScalarQueryParameter("data_fim", "DATE", campanha.get("data_fim")),
-        ]
-    )
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
     linhas = list(client.query(query, job_config=job_config).result())
 
     # 1ª passada: soma a produção total do período pra saber qual faixa
@@ -1017,7 +1031,11 @@ def gerar_relatorio_apuracao(campanha_id):
 
         criterio_encontrado = _escolher_criterio_da_linha(criterios_da_campanha, linha_dict)
 
-        if sem_criterios or criterio_encontrado is None:
+        if not aval["tier_atingido"]:
+            # Campanha não alcançou nenhuma faixa → nada é pago, nem os
+            # contratos com % especial (mesma regra do cenário atual).
+            valor_apuracao = 0.0
+        elif sem_criterios or criterio_encontrado is None:
             valor_apuracao = 0.0
         elif criterio_encontrado.get("status") == STATUS_CRITERIO_NAO_CONTABILIZAR:
             valor_apuracao = 0.0
