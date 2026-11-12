@@ -40,6 +40,16 @@ function rotuloCampoMapeado(valor) {
   return valor;
 }
 
+const LIMITE_LISTA = 200;
+
+function faixaPrazo(crit) {
+  const min = crit.prazo_min, max = crit.prazo_max;
+  if (min == null && max == null) return "—";
+  if (max == null) return `${min}+`;
+  if (min == null) return `até ${max}`;
+  return `${min}–${max}`;
+}
+
 function bloqueado(status) {
   return status === "Finalizada" || status === "Em Apuração";
 }
@@ -47,6 +57,7 @@ function bloqueado(status) {
 export default function CampanhasCriterios() {
   const queryClient = useQueryClient();
   const [filtroBanco, setFiltroBanco] = useState("");
+  const [buscaCriterio, setBuscaCriterio] = useState("");
   const [filtroCampanha, setFiltroCampanha] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroDataInicio, setFiltroDataInicio] = useState("");
@@ -73,6 +84,15 @@ export default function CampanhasCriterios() {
     if (filtroDataFim && c.data_inicio && c.data_inicio > filtroDataFim) return false;
     return true;
   });
+
+  function criteriosVisiveis(campanhaId) {
+    const termo = buscaCriterio.trim().toLowerCase();
+    const todos = criteriosDaCampanha(campanhaId);
+    const filtrados = termo
+      ? todos.filter((c) => [c.tabela, c.convenio, c.produto, c.descr_tabela].some((v) => (v || "").toString().toLowerCase().includes(termo)))
+      : todos;
+    return { total: filtrados.length, lista: filtrados.slice(0, LIMITE_LISTA) };
+  }
 
   function criteriosDaCampanha(campanhaId) {
     return criterios.filter((c) => c.campanha_id === campanhaId);
@@ -376,17 +396,36 @@ export default function CampanhasCriterios() {
 
             {criteriosDaCampanha(modalCampanha.id).length > 0 && (
               <>
-                <p className="section-label" style={{ marginTop: "1.5rem" }}>Critérios já cadastrados nessa campanha</p>
+                <p className="section-label" style={{ marginTop: "1.5rem" }}>
+                  Critérios já cadastrados nessa campanha ({criteriosDaCampanha(modalCampanha.id).length.toLocaleString("pt-BR")})
+                </p>
+                {/* Campanhas importadas em lote têm milhares de critérios: lista
+                    só os primeiros LIMITE_LISTA que batem com a busca, senão a
+                    janela trava montando dezenas de milhares de linhas. */}
+                <input
+                  type="text"
+                  value={buscaCriterio}
+                  onChange={(e) => setBuscaCriterio(e.target.value)}
+                  placeholder="Buscar por tabela, convênio, produto ou descrição…"
+                  style={{ marginBottom: "0.5rem" }}
+                />
+                {criteriosVisiveis(modalCampanha.id).total > LIMITE_LISTA && (
+                  <p className="muted small" style={{ margin: "0 0 0.5rem" }}>
+                    Mostrando {LIMITE_LISTA} de {criteriosVisiveis(modalCampanha.id).total.toLocaleString("pt-BR")} — use a busca para encontrar um critério.
+                  </p>
+                )}
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>Convênio</th><th>Produto</th><th>Tabela</th><th>Base</th><th>% especial</th><th></th></tr></thead>
+                    <thead><tr><th>Convênio</th><th>Produto</th><th>Tabela</th><th>Prazo</th><th>Vigência</th><th>Status</th><th>% especial</th><th></th></tr></thead>
                     <tbody>
-                      {criteriosDaCampanha(modalCampanha.id).map((crit) => (
+                      {criteriosVisiveis(modalCampanha.id).lista.map((crit) => (
                         <tr key={crit.id}>
                           <td className="small">{rotuloCampoMapeado(crit.convenio)}</td>
                           <td className="small">{rotuloCampoMapeado(crit.produto)}</td>
-                          <td className="mono small">{crit.tabela}</td>
-                          <td className="small">{crit.base_producao_criterio === "bruto" ? "Bruto" : "Líquido"}</td>
+                          <td className="mono small" title={crit.descr_tabela || ""}>{crit.tabela}</td>
+                          <td className="small">{faixaPrazo(crit)}</td>
+                          <td className="small">{crit.data_inicio || crit.data_fim ? `${dataBr(crit.data_inicio) || "…"} a ${dataBr(crit.data_fim) || "…"}` : "—"}</td>
+                          <td className="small">{crit.status === "nao_contabilizar" ? "Não contabilizar" : "Ativo"}</td>
                           <td className="mono small">{percentual(crit.perc_especial)}</td>
                           <td style={{ whiteSpace: "nowrap" }}>
                             <button className="btn-link" onClick={() => abrirEditarCriterio(modalCampanha, crit)} disabled={bloqueado(modalCampanha.status)} style={{ marginRight: "0.4rem" }}>

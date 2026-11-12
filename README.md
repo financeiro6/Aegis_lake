@@ -83,6 +83,17 @@ acessa no navegador**, não o :8000.
 
 ## O que já está pronto
 
+- **Importação em lote de campanhas e critérios** (Campanhas → Cadastro,
+  só admin; `backend/lib/importacao_campanhas.py`): planilha .xlsx com as
+  abas "Campanhas" e "Critérios" (cabeçalho na linha 3, mesmas colunas da
+  tela). Mostra prévia (novas × já existentes, linhas com erro) e só grava
+  ao confirmar — uma carga por tabela no BigQuery. Tudo recebe o mesmo
+  `lote_importacao` e pode ser desfeito inteiro; o mesmo arquivo não entra
+  duas vezes. As regras de cálculo não mudam: cada linha é um critério
+  igual ao cadastrado pela tela. Para aguentar milhares de critérios, a
+  escolha do critério de cada contrato olha só os critérios da tabela do
+  contrato + os sem tabela (mesmo resultado, `_indexar_criterios`), e a
+  janela de critérios lista 200 por vez com busca.
 - **Design system novo**: Tailwind v4 + tokens em OKLCH + fontes (Space
   Grotesk para títulos, DM Sans para o corpo, JetBrains Mono para
   números/código) — ver `frontend/src/theme.css`. O `style.css` original

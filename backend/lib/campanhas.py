@@ -54,6 +54,9 @@ SCHEMA_CAMPANHAS = [
     bigquery.SchemaField("filtro_map_produto", "STRING"),
     bigquery.SchemaField("criado_em", "TIMESTAMP"),
     bigquery.SchemaField("criado_por", "STRING"),
+    # Preenchido só no que entrou por importação em lote (lib/importacao_campanhas.py),
+    # para poder desfazer a importação inteira de uma vez.
+    bigquery.SchemaField("lote_importacao", "STRING"),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -101,6 +104,9 @@ SCHEMA_CRITERIOS = [
     bigquery.SchemaField("perc_especial", "FLOAT64"),
     bigquery.SchemaField("criado_em", "TIMESTAMP"),
     bigquery.SchemaField("criado_por", "STRING"),
+    # Preenchido só no que entrou por importação em lote (lib/importacao_campanhas.py),
+    # para poder desfazer a importação inteira de uma vez.
+    bigquery.SchemaField("lote_importacao", "STRING"),
 ]
 
 STATUS_CAMPANHA_BLOQUEIA_EDICAO = ["Finalizada", "Em Apuração"]
@@ -651,6 +657,7 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
     linhas = _detalhes_producao_campanha(campanha, di, df)
     criterios_todos = listar_criterios()
     criterios_da_campanha = [c for c in criterios_todos if c.get("campanha_id") == campanha_id]
+    indice = _indexar_criterios(criterios_da_campanha)
 
     coluna_valor = "vlr_bruto" if campanha.get("base_producao") == "bruto" else "vlr_liquido"
 
@@ -665,7 +672,7 @@ def calcular_cenarios_campanha(campanha_id, data_inicio=None, data_fim=None):
         producao_atual += valor_base_campanha
         if linha.get("data_pagamento"):
             datas_com_producao.add(linha["data_pagamento"])
-        criterio_encontrado = _escolher_criterio_da_linha(criterios_da_campanha, linha)
+        criterio_encontrado = _escolher_criterio_da_linha(criterios_da_campanha, linha, indice)
         linhas_com_criterio.append((linha, criterio_encontrado))
 
     # 2ª passada: separa o que cada contrato vale em duas partes, porque
@@ -943,14 +950,43 @@ def _prioridade_criterio(criterio):
     return 1
 
 
-def _escolher_criterio_da_linha(criterios_da_campanha, linha):
+def _chave_tabela_linha(linha):
+    """Mesma chave que _criterio_aplica compara com a "tabela" do critério."""
+    return str(linha.get("cod_tabela") or linha.get("tabela") or "").strip()
+
+
+def _indexar_criterios(criterios_da_campanha):
+    """Separa os critérios por tabela, só para não testar todos os
+    critérios em cada contrato. Um critério com tabela só pode bater num
+    contrato com aquela mesma tabela (_criterio_aplica exige igualdade),
+    então olhar só os da tabela do contrato + os sem tabela dá exatamente
+    o mesmo resultado — com milhares de critérios (ex.: importação em lote)
+    a diferença é de horas para segundos."""
+    por_tabela, sem_tabela = {}, []
+    for criterio in criterios_da_campanha:
+        if criterio.get("tabela"):
+            por_tabela.setdefault(str(criterio["tabela"]).strip(), []).append(criterio)
+        else:
+            sem_tabela.append(criterio)
+    return por_tabela, sem_tabela
+
+
+def _escolher_criterio_da_linha(criterios_da_campanha, linha, indice=None):
     """Entre TODOS os critérios da campanha que baterem nessa linha,
     escolhe um só, pela prioridade da regra de negócio (ver
     _prioridade_criterio); em caso de empate no mesmo nível, vence o mais
     específico (_especificidade_criterio); e se ainda empatar, o
     cadastrado mais recentemente (desempate determinístico de último
-    caso — não é a regra principal). Se nenhum critério bater, None."""
-    candidatos = [c for c in criterios_da_campanha if _criterio_aplica(c, linha)]
+    caso — não é a regra principal). Se nenhum critério bater, None.
+
+    `indice` (de _indexar_criterios) é opcional e só acelera: limita os
+    candidatos aos critérios da tabela do contrato + os sem tabela."""
+    if indice is not None:
+        por_tabela, sem_tabela = indice
+        possiveis = por_tabela.get(_chave_tabela_linha(linha), []) + sem_tabela
+    else:
+        possiveis = criterios_da_campanha
+    candidatos = [c for c in possiveis if _criterio_aplica(c, linha)]
     if not candidatos:
         return None
     candidatos.sort(
@@ -989,6 +1025,7 @@ def gerar_relatorio_apuracao(campanha_id):
 
     criterios_todos = listar_criterios()
     criterios_da_campanha = [c for c in criterios_todos if c.get("campanha_id") == campanha_id]
+    indice = _indexar_criterios(criterios_da_campanha)
     faixas_metas = campanha.get("faixas_metas") or []
 
     coluna_valor = "vlr_bruto" if campanha.get("base_producao") == "bruto" else "vlr_liquido"
@@ -1029,7 +1066,7 @@ def gerar_relatorio_apuracao(campanha_id):
     for linha in linhas:
         linha_dict = dict(linha)
 
-        criterio_encontrado = _escolher_criterio_da_linha(criterios_da_campanha, linha_dict)
+        criterio_encontrado = _escolher_criterio_da_linha(criterios_da_campanha, linha_dict, indice)
 
         if not aval["tier_atingido"]:
             # Campanha não alcançou nenhuma faixa → nada é pago, nem os

@@ -292,3 +292,56 @@ def criterios_auditoria():
         return jsonify(listar_auditoria_criterios(campanha_id=campanha_id))
     except Exception as exc:  # noqa: BLE001
         return jsonify({"erro": str(exc)}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Importação em lote (lib/importacao_campanhas.py) — só admin
+# ─────────────────────────────────────────────────────────────────────────
+def _arquivo_importacao():
+    arquivo = request.files.get("arquivo")
+    if not arquivo or not arquivo.filename:
+        raise ValueError("Anexe a planilha (.xlsx) com as abas Campanhas e Critérios.")
+    if not arquivo.filename.lower().endswith(".xlsx"):
+        raise ValueError("O arquivo precisa ser .xlsx.")
+    return arquivo.read()
+
+
+@bp_campanhas.route("/campanhas/importacao/previa", methods=["POST"])
+@requer_papel(["admin"])
+def campanhas_importacao_previa():
+    from lib.importacao_campanhas import previa
+
+    try:
+        return jsonify(previa(_arquivo_importacao()))
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": str(exc)}), 500
+
+
+@bp_campanhas.route("/campanhas/importacao", methods=["GET", "POST"])
+@requer_papel(["admin"])
+def campanhas_importacao():
+    from lib.importacao_campanhas import importar, listar_lotes
+
+    try:
+        if request.method == "GET":
+            return jsonify(listar_lotes())
+        return jsonify(importar(_arquivo_importacao(), usuario_atual()["email"]))
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": str(exc)}), 500
+
+
+@bp_campanhas.route("/campanhas/importacao/<lote>", methods=["DELETE"])
+@requer_papel(["admin"])
+def campanhas_importacao_desfazer(lote):
+    from lib.importacao_campanhas import desfazer
+
+    try:
+        return jsonify(desfazer(lote, usuario_atual()["email"]))
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"erro": str(exc)}), 500

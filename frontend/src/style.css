@@ -1520,6 +1520,13 @@ input[type="number"]::-webkit-inner-spin-button {
   background: color-mix(in oklab, var(--surface-raised) 45%, transparent);
 }
 
+/* tabelas da importação em lote (Campanhas → Cadastro): espaço entre colunas */
+.tabela-importacao th,
+.tabela-importacao td {
+  padding-right: 1rem;
+  white-space: nowrap;
+}
+
 /* ══ Responsivo ═══════════════════════════════════════════════════════════
    Tudo que é específico de tablet/celular fica neste bloco. Acima de 900px
    (computador) nenhuma regra daqui se aplica — o layout é o de sempre. */

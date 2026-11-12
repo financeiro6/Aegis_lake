@@ -8,6 +8,8 @@ import Modal from "../components/Modal";
 import { Plus, Trash, Settings, DollarSign, Download, Refresh } from "../components/icons";
 import { brl, percentual } from "../utils/format";
 import { VALORES_ABERTOS_ATIVO } from "../config/funcionalidades";
+import ImportacaoCampanhas from "../components/ImportacaoCampanhas";
+import { useAuth } from "../context/AuthContext";
 
 const STATUS_OPCOES = ["Vigente", "Finalizada", "Em Apuração"];
 
@@ -50,6 +52,7 @@ async function buscarAtingimento() {
 
 export default function CampanhasCadastro() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
   const [form, setForm] = useState(FORM_VAZIO);
   const [editandoId, setEditandoId] = useState(null);
   const [mensagem, setMensagem] = useState(null);
@@ -289,6 +292,8 @@ export default function CampanhasCadastro() {
   return (
     <div className="fade-in">
       <PageHeader icon={<Plus />} title="Cadastro" subtitle="Cadastre, edite ou remova campanhas e seus bônus por faixa." />
+
+      {usuario?.papel === "admin" && <ImportacaoCampanhas />}
 
       {mensagem && (
         <div className={`fade-in ${mensagem.ok ? "card status-card-ok" : "card error-card"}`}>
