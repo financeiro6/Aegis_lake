@@ -1519,3 +1519,258 @@ input[type="number"]::-webkit-inner-spin-button {
 .table-blocos tbody tr:nth-child(even) {
   background: color-mix(in oklab, var(--surface-raised) 45%, transparent);
 }
+
+/* ══ Responsivo ═══════════════════════════════════════════════════════════
+   Tudo que é específico de tablet/celular fica neste bloco. Acima de 900px
+   (computador) nenhuma regra daqui se aplica — o layout é o de sempre. */
+
+/* Botões da gaveta: escondidos no computador */
+.topbar-menu,
+.sidebar-fechar,
+.sidebar-fundo {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  /* menu lateral vira gaveta por cima do conteúdo */
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(280px, 85vw);
+    z-index: 90;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    gap: 1.25rem;
+  }
+
+  .sidebar.aberta {
+    transform: translateX(0);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar-fundo {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 8, 15, 0.6);
+    z-index: 80;
+    animation: fade-in-up 0.15s ease both;
+  }
+
+  .sidebar-fechar {
+    display: inline-flex;
+    align-self: flex-end;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin: -0.75rem -0.25rem -1.25rem 0;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--muted);
+  }
+
+  body.sem-rolagem {
+    overflow: hidden;
+  }
+
+  .sidenav a,
+  .nav-group summary,
+  .nav-group-items a {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+
+  /* topo: botão do menu à esquerda, usuário à direita */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    justify-content: space-between;
+    align-items: center;
+    margin: -1.25rem -1.25rem 1rem;
+    padding: 0.6rem 1.25rem;
+    background: var(--base);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .topbar-menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .main-area {
+    padding: 1.25rem;
+  }
+
+  .page-header {
+    margin-bottom: 1.25rem;
+  }
+
+  /* tabelas largas rolam na horizontal dentro do próprio card, em vez de
+     empurrar a página para os lados */
+  .card > table,
+  .table-wrap > table,
+  .accordion-body > table,
+  .modal table:not(.form-table) {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* tabela de cenários das Campanhas já fica num contêiner com rolagem
+     própria: não vira bloco, senão rola duas vezes */
+  .card > table.table-blocos,
+  .table-wrap > table.table-blocos {
+    display: table;
+  }
+
+  .card > table th,
+  .card > table td,
+  .table-wrap > table th,
+  .table-wrap > table td {
+    white-space: nowrap;
+    padding-right: 0.9rem;
+  }
+
+  .card-fit {
+    width: 100%;
+  }
+
+  /* cartões de valores: quebram de linha quando não cabem três, e o
+     número encolhe um pouco em vez de estourar o cartão */
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
+  .kpi-value {
+    font-size: clamp(1.35rem, 3.6vw, 1.75rem);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 600px) {
+  .main-area {
+    padding: 1rem;
+  }
+
+  .topbar {
+    margin: -1rem -1rem 1rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .page-title,
+  .page-header h1 {
+    font-size: 1.15rem;
+  }
+
+  /* filtros e formulários: um campo por linha, ocupando a largura toda */
+  .filter-grid,
+  .filter-form {
+    gap: 0.75rem;
+  }
+
+  /* dois campos por linha; o que não couber desce sozinho */
+  .filter-grid > *,
+  .filter-form > * {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .filter-grid > .form-row-action,
+  .filter-form > .form-row-action {
+    flex-basis: 100%;
+  }
+
+  /* campo de texto livre (nome, e-mail, busca…) precisa da linha inteira;
+     seletores e datas continuam em pares */
+  .filter-grid > .form-row:has(> input[type="text"], > input[type="email"], > input[type="password"], > input[type="search"], > input:not([type]), > textarea),
+  .form-grid > .form-row:has(> input[type="text"], > input[type="email"], > input[type="password"], > textarea) {
+    flex-basis: 100%;
+    grid-column: 1 / -1;
+  }
+
+  .filter-grid .form-row {
+    min-width: 0;
+  }
+
+  .filter-actions > button,
+  .filter-actions > .btn,
+  .form-row-action > button {
+    flex: 1 1 auto;
+  }
+
+  .search-form {
+    flex-wrap: wrap;
+  }
+
+  /* campo de busca numa linha, botões embaixo dividindo a largura */
+  /* !important: os campos de busca têm style={{ flex: 1 }} no JSX */
+  .search-form > input,
+  .search-form > .form-row {
+    flex: 1 1 100% !important;
+  }
+
+  .search-form > button,
+  .search-form > .btn {
+    flex: 1 1 auto;
+  }
+
+  .inline-mapping-form {
+    flex-wrap: wrap;
+  }
+
+  .inline-mapping-form input[type="text"] {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .form-table td.form-table-label {
+    white-space: normal;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* campos com 16px: abaixo disso o Safari do iPhone dá zoom ao focar */
+  select,
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]) {
+    font-size: 16px;
+  }
+
+  /* janelas ocupam a tela quase toda e rolam por dentro */
+  .modal-overlay {
+    align-items: flex-end;
+  }
+
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92dvh;
+    overflow-y: auto;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .user-menu-dropdown {
+    width: min(260px, calc(100vw - 2rem));
+  }
+}

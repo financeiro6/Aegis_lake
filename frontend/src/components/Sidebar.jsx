@@ -12,6 +12,7 @@ import {
   Megaphone,
   Users,
   DollarSign,
+  Close,
   Plus,
   Table,
 } from "./icons";
@@ -56,7 +57,7 @@ function Item({ to, icon, children, papel }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ aberta = false, aoFechar }) {
   const { usuario } = useAuth();
   const papel = usuario?.papel;
   const location = useLocation();
@@ -70,7 +71,10 @@ export default function Sidebar() {
   const valoresAbertosAtivo = VALORES_ABERTOS_PATHS.includes(location.pathname);
 
   return (
-    <aside className="sidebar">
+    <aside className={aberta ? "sidebar aberta" : "sidebar"}>
+      <button type="button" className="sidebar-fechar" onClick={aoFechar} aria-label="Fechar menu">
+        <Close />
+      </button>
       <div className="brand">
         <img src="/aegis-logo.png" className="brand-mark-img" alt="Aegis" />
         <div className="brand-name">

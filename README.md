@@ -27,6 +27,12 @@ taurus/
 - Os dois se falam via **proxy do Vite** (`/api/*` → `localhost:8000`) —
   isso faz o navegador achar que é tudo a mesma origem, então cookies de
   sessão funcionam normalmente e não tem CORS pra configurar.
+- **Responsivo** (bloco "Responsivo" no fim de `frontend/src/style.css`):
+  até 900px o menu lateral vira gaveta (botão no topo, fecha ao navegar,
+  no fundo escuro ou com Esc), tabelas largas rolam dentro do card e os
+  cartões de valores quebram de linha; até 600px filtros ficam em pares
+  (texto livre na linha inteira), campos com 16px (sem zoom no iPhone) e
+  janelas sobem de baixo ocupando a largura. Acima de 900px nada muda.
 - **Resumo em memória do Dashboard** (`backend/lib/resumo.py`): uma
   consulta só agrupa a base por dia × banco × convênio × produto (últimos
   `RESUMO_MESES` meses, padrão 36) e guarda o resultado na memória do
