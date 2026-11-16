@@ -1112,6 +1112,12 @@ button.is-loading,
     box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
+/* Página, cartão e acordeão usam "backwards" (não "both"): com "both" o
+   transform final (translateY(0)) fica aplicado para sempre, cada cartão
+   vira uma camada própria e o cartão seguinte é pintado por cima de
+   qualquer lista suspensa aberta no anterior (ex.: Convênio em Campanhas →
+   Cadastro ficava escondido atrás da tabela). "backwards" só segura o
+   estado inicial antes de começar e não deixa nada depois de terminar. */
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -1124,11 +1130,11 @@ button.is-loading,
 }
 
 .fade-in {
-  animation: fade-in-up 0.28s ease both;
+  animation: fade-in-up 0.28s ease backwards;
 }
 
 .card {
-  animation: fade-in-up 0.24s ease both;
+  animation: fade-in-up 0.24s ease backwards;
 }
 
 button,
@@ -1166,7 +1172,7 @@ tbody tr:hover {
    de suavidade sem precisar de JS de altura calculada. */
 .nav-group-items,
 .accordion-body {
-  animation: fade-in-up 0.18s ease both;
+  animation: fade-in-up 0.18s ease backwards;
 }
 
 .nav-group summary,
